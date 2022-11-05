@@ -1,0 +1,54 @@
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#define WIN32
+#include <time.h>
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <sys/time.h>
+#endif
+#ifdef WIN32
+int gettimeofday(struct timeval *tp, void *tzp) {
+    time_t clock;
+    struct tm tm;
+    SYSTEMTIME wtm;
+    GetLocalTime(&wtm);
+    tm.tm_year = wtm.wYear - 1900;
+    tm.tm_mon = wtm.wMonth - 1;
+    tm.tm_mday = wtm.wDay;
+    tm.tm_hour = wtm.wHour;
+    tm.tm_min = wtm.wMinute;
+    tm.tm_sec = wtm.wSecond;
+    tm.tm_isdst = -1;
+    clock = mktime(&tm);
+    tp->tv_sec = clock;
+    tp->tv_usec = wtm.wMilliseconds * 1000;
+    return (0);
+}
+#endif
+// #include <omp.h>
+
+#ifdef WIN32
+// get logical cpu core num and store in cpu_num
+int get_cpu_core_num() {
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+}
+#else
+int get_cpu_core_num() { return sysconf(_SC_NPROCESSORS_ONLN); }
+#endif
+
+static const int thread_count = 4;
+
+
+
+int main() {
+    int a = 13123;
+    int b = a / 4;
+    printf("a = %d, b = %d \n", a, b);
+
+    int c = b * 4;
+    printf("c = %d \n", c);
+}
