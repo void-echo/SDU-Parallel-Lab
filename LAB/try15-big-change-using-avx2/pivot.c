@@ -29,16 +29,6 @@ int gettimeofday(struct timeval *tp, void *tzp) {
 #endif
 #include <omp.h>
 
-#ifdef _WIN32
-// get logical cpu core num and store in cpu_num
-int get_cpu_core_num() {
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    return sysinfo.dwNumberOfProcessors;
-}
-#else
-int get_cpu_core_num() { return sysconf(_SC_NPROCESSORS_ONLN); }
-#endif
 
 static const int thread_count = 2;
 static double *points;
@@ -314,7 +304,7 @@ int main(int argc, char *argv[]) {
         // set omp thread number
 #pragma omp parallel for 
         for (int i = 0; i < len; i++) {
-            printf("HERE\n");
+            // printf("HERE\n");
             int tid = omp_get_thread_num();
             int d1 = tid * m * n;
             int *values = object[i].values;

@@ -29,17 +29,6 @@ int gettimeofday(struct timeval *tp, void *tzp) {
 #endif
 #include <omp.h>
 
-#ifdef _WIN32
-// get logical cpu core num and store in cpu_num
-int get_cpu_core_num() {
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    return sysinfo.dwNumberOfProcessors;
-}
-#else
-int get_cpu_core_num() { return sysconf(_SC_NPROCESSORS_ONLN); }
-#endif
-
 static const int thread_count = 6;
 static double *points;
 static int n, dim, nums_p, p_dot_id;
