@@ -1,12 +1,14 @@
+#include <immintrin.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
-#include <immintrin.h>
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <sys/time.h>
+#include <getopt.h>
 #endif
 #ifdef _WIN32
 int gettimeofday(struct timeval *tp, void *tzp) {
@@ -26,10 +28,72 @@ int gettimeofday(struct timeval *tp, void *tzp) {
     tp->tv_usec = wtm.wMilliseconds * 1000;
     return (0);
 }
+int opterr = 1, /* if error message should be printed */
+    optind = 1, /* index into parent argv vector */
+    optopt,     /* character checked for validity */
+    optreset;   /* reset getopt */
+char *optarg;   /* argument associated with option */
+
+#define BADCH (int)'?'
+#define BADARG (int)':'
+#define EMSG ""
+
+/*
+ * getopt --
+ *      Parse argc/argv argument vector.
+ * I wrote this code for use of `getopt` on Windows platform.
+ * If it is on Linux, `getopt` is already defined.
+ */
+int getopt(int nargc, char *const nargv[], const char *ostr) {
+    static char *place = EMSG; /* option letter processing */
+    const char *oli;           /* option letter list index */
+
+    if (optreset || !*place) { /* update scanning pointer */
+        optreset = 0;
+        if (optind >= nargc || *(place = nargv[optind]) != '-') {
+            place = EMSG;
+            return (-1);
+        }
+        if (place[1] && *++place == '-') { /* found "--" */
+            ++optind;
+            place = EMSG;
+            return (-1);
+        }
+    } /* option letter okay? */
+    if ((optopt = (int)*place++) == (int)':' || !(oli = strchr(ostr, optopt))) {
+        /*
+         * if the user didn't specify '-' as an option,
+         * assume it means -1.
+         */
+        if (optopt == (int)'-') return (-1);
+        if (!*place) ++optind;
+        if (opterr && *ostr != ':')
+            (void)printf("illegal option -- %c\n", optopt);
+        return (BADCH);
+    }
+    if (*++oli != ':') { /* don't need argument */
+        optarg = NULL;
+        if (!*place) ++optind;
+    } else {        /* need an argument */
+        if (*place) /* no white space */
+            optarg = place;
+        else if (nargc <= ++optind) { /* no arg */
+            place = EMSG;
+            if (*ostr == ':') return (BADARG);
+            if (opterr)
+                (void)printf("option requires an argument -- %c\n", optopt);
+            return (BADCH);
+        } else /* white space */
+            optarg = nargv[optind];
+        place = EMSG;
+        ++optind;
+    }
+    return (optopt); /* dump back option letter */
+}
 #endif
 #include <omp.h>
 
-static const int thread_count = 6;
+static int thread_count = 6;
 static double *points;
 static int n, dim, nums_p, p_dot_id;
 #define INLINE inline
@@ -54,7 +118,7 @@ typedef struct {
 } combination;
 
 static combination *object;
-static double* cache_eu_dist;      // size: thread_count * m * n
+static double *cache_eu_dist;  // size: thread_count * m * n
 
 // return the original Euclidean coordinate of the point
 static INLINE double get_point_coordinate_of_id_and_dimension(int id,
@@ -90,7 +154,8 @@ static INLINE void calcEuclideanDistanceAndStoreInArray() {
     }
 }
 static long long int run_times = 0;
-static INLINE double calcOneChebyshevDistance(int dot_id1, int dot_id2, int tid) {
+static INLINE double calcOneChebyshevDistance(int dot_id1, int dot_id2,
+                                              int tid) {
     double max = 0;
     int d1 = tid * m * n;
     for (int i = 0; i < m; i++) {
@@ -244,17 +309,27 @@ static void INLINE dmp_object_array_to_file() {
 }
 
 int main(int argc, char *argv[]) {
-    omp_set_num_threads(thread_count);
     int DEBUG = 0;  // 0: run the program normally, 1: run some unit tests
     if (!DEBUG) {
-        printf("NOT DEBUG MODE!\n");
         char *filename = (char *)"uniformvector-2dim-5h.txt";
-        if (argc == 2) {
-            filename = argv[1];
-        } else if (argc != 1) {
-            printf("Usage: ./pivot <filename>\n");
-            return -1;
+        // usage: ./pivot -f <filename> -t <thread_count>
+        // parse command line arguments
+        int opt;
+        while ((opt = getopt(argc, argv, "f:t:")) != -1) {
+            switch (opt) {
+                case 'f':
+                    filename = optarg;
+                    break;
+                case 't':
+                    thread_count = atoi(optarg);
+                    omp_set_num_threads(thread_count);
+                    break;
+                default:
+                    printf("Usage: ./pivot -f <filename> -t <thread_count>");
+                    return -1;
+            }
         }
+
         struct timeval start, end;
 
         // M : number of combinations to store
@@ -268,12 +343,12 @@ int main(int argc, char *argv[]) {
         fscanf(file, "%d", &n);
         fscanf(file, "%d", &nums_p);
         m = nums_p;
-        printf("dim = %d, point number = %d, pivot numver = %d\n", dim, n,
-               nums_p);
+        printf("dim = %d, point number = %d, pivot numver = %d, thread number = %d, using file %s\n", dim, n,
+               nums_p, thread_count, filename);
 
         // allocate memory for points
         points = (double *)malloc(sizeof(double) * n * dim);
-        cache_eu_dist = (double*) malloc(sizeof(double) * thread_count * m * n);
+        cache_eu_dist = (double *)malloc(sizeof(double) * thread_count * m * n);
         // read points
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < dim; j++) {
@@ -308,15 +383,14 @@ int main(int argc, char *argv[]) {
                 int pivot_id = values[__m__];
                 int _d2 = pivot_id * n;
                 for (int __n__ = 0; __n__ < n; __n__++) {
-                    cache_eu_dist[d2 + __n__] =
-                        euclidean_distance[_d2 + __n__];
+                    cache_eu_dist[d2 + __n__] = euclidean_distance[_d2 + __n__];
                 }
             }
             for (int __i__ = 0; __i__ < n; __i__++) {
                 int bound = __i__ + 1;
                 for (int __j__ = bound; __j__ < n; __j__++) {
-                    object[i].cost += calcOneChebyshevDistance(
-                        __i__, __j__, tid);
+                    object[i].cost +=
+                        calcOneChebyshevDistance(__i__, __j__, tid);
                 }
             }
         }
