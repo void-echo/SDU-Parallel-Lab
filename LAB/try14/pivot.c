@@ -142,6 +142,7 @@ static INLINE double get_euclidean_distance(int id1, int id2) {
 }
 
 static INLINE void calcEuclideanDistanceAndStoreInArray() {
+    #pragma omp parallel for num_threads(thread_count)
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             if (i == j) {
@@ -369,6 +370,7 @@ int main(int argc, char *argv[]) {
         calcEuclideanDistanceAndStoreInArray();
         printf("Euclidean distance calculated.\n");
         calc_all_combinations_and_store_in_object();
+        printf("all combinations calculated.\n");
 
         // *********************************************************
         int len = c_n_m(n, m);
@@ -396,14 +398,14 @@ int main(int argc, char *argv[]) {
         }
 
         // sort the object array by cost
-        sort_object_array_by_cost(1);
+        sort_object_array_by_cost(0);   // 1: show debug message, 0: not
 
         // end timer
         gettimeofday(&end, NULL);
         printf("time cost: %ld ms \n",
                (end.tv_sec - start.tv_sec) * 1000 +
                    (end.tv_usec - start.tv_usec) / 1000);
-        sniff_object_array();  // result seems to be correct :-)
+        // sniff_object_array();  // result seems to be correct :-)
         dmp_object_array_to_file();
         free(points);
         free(euclidean_distance);
