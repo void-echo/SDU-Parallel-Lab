@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # This script is used to test the time cost of the program `pivot.c`.
-
 # first make clean and make the program
 make clean
 make
@@ -13,12 +12,10 @@ declare exe_name="out"
 
 if [ "$isSmallTestOrBigTest" = "small" ]; then
     declare -a thread_nums=("1" "2" "4" "8" "12" "16")
-    # declare -a file_names=("./uniformvector-2dim-5h.txt" "./uniformvector-4dim-1h.txt");
     declare -a file_names=("./uniformvector-2dim-5h.txt")
 
 elif [ "$isSmallTestOrBigTest" = "big" ]; then
     declare -a thread_nums=("1" "2" "4" "8" "12" "16" "32" "64")
-    # declare -a file_names=("./uniformvector-2dim-5h.txt" "./uniformvector-4dim-1h.txt");
     declare -a file_names=("./uniformvector-2dim-5h.txt" "./uniformvector-4dim-1h.txt")
 
 fi

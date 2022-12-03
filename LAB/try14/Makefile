@@ -1,5 +1,5 @@
 out:
-	gcc -Wall -Ofast -march=native -fopenmp -ffast-math ./pivot.c -o out
+	gcc -Wall -Ofast -fopenmp -ffast-math ./pivot.c -o out
 
 clean:
 	rm -f out
