@@ -1,4 +1,4 @@
-Idea can be found in our [Notion notes] (https://www.notion.so/void-echo/Parallel-Algorithm-LAB-9cbe47f61d9846cdb06b62b23aae0865)
+Idea can be found in our [Notion notes](https://www.notion.so/void-echo/Parallel-Algorithm-LAB-9cbe47f61d9846cdb06b62b23aae0865)
 
 
 ⚠ The repo's documentation & notion notes is not complete and not entirely consistent with our latest idea. If you want to see the actual ideas, See `try14` and `try16` folders.
