@@ -7,8 +7,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <sys/time.h>
 #include <getopt.h>
+#include <sys/time.h>
 #endif
 #ifdef _WIN32
 int gettimeofday(struct timeval *tp, void *tzp) {
@@ -93,8 +93,8 @@ int getopt(int nargc, char *const nargv[], const char *ostr) {
 #endif
 #include <omp.h>
 
-static int thread_count = 6; // 默认线程数
-static double *points; 
+static int thread_count = 6;
+static double *points;
 static int n, dim, nums_p, p_dot_id;
 #define INLINE inline
 
@@ -102,35 +102,33 @@ static int n, dim, nums_p, p_dot_id;
 // for gcc, this is right, but VSCode cannot recognize it, and mark it as
 // error! 😰
 
-// n : number of points, 顶点的数量
-// dim : dimension of points, 顶点的维度
-// nums_p : number of pivots, 支撑点的数量
-// p_dot_id : pivot dot id 支撑点的id
+// n : number of points,
+
+// dim : dimension of points,
+// nums_p : number of pivots,
+// p_dot_id : pivot dot id
 
 static int m = 2;
 static int count = 0;
-static double *euclidean_distance; // 欧几里得距离
+static double *euclidean_distance;
 
 typedef struct {
-    int *values; // 组合的顶点index
-    double cost; // 目标函数值
-} combination; 
+    int *values;
+    double cost;
+} combination;
 
 static combination *object;
-static double *cache_eu_dist;  // size: thread_count * m * n
+static double **cache_eu_dist;  // size: thread_count * m * n
 
 // return the original Euclidean coordinate of the point
-// 返回顶点在原始坐标系下的某一维的坐标
-static INLINE double get_point_coordinate_of_id_and_dimension(int id, int dimension) {
+static INLINE double get_point_coordinate_of_id_and_dimension(int id,
+                                                              int dimension) {
     return points[id * dim + dimension];
 }
-
-// calculate the Euclidean distance between two points, in the original coordinate
-// 计算在原始坐标系下两点之间的欧几里得距离 d(x1,x2)
+// calculate the Euclidean distance between two points, in the original
+// coordinate
 static INLINE double calc_distance(int id1, int id2) {
     double sum = 0;
-    // 更改5，没作用
-    // #pragma omp parallel for num_threads(thread_count)
     for (int i = 0; i < dim; i++) {
         double diff = get_point_coordinate_of_id_and_dimension(id1, i) -
                       get_point_coordinate_of_id_and_dimension(id2, i);
@@ -139,81 +137,74 @@ static INLINE double calc_distance(int id1, int id2) {
     return sqrt(sum);
 }
 
-// 获得两点之间的欧几里得距离
 static INLINE double get_euclidean_distance(int id1, int id2) {
     return euclidean_distance[id1 * n + id2];
 }
 
-// 计算每对顶点的欧几里得距离并存储在数组中
 static INLINE void calcEuclideanDistanceAndStoreInArray() {
-    // #pragma omp parallel for num_threads(thread_count)
-    // 更改3: 加入collapse(2)
-    #pragma omp parallel for num_threads(thread_count)
+#pragma omp parallel for num_threads(thread_count)
     for (int i = 0; i < n; i++) {
-        // 更改4，大概优化100ms
-        for (int j = i; j < n; j++) {
-            // if (i == j) {
-            //     euclidean_distance[i * n + j] = 0;
-            // } else {
-            //     euclidean_distance[i * n + j] = calc_distance(i, j);
-            // }
-            // *更改1：更换为三目运算符
-            // euclidean_distance[i * n + j] = (i == j) ? 0 : calc_distance(i, j);
-            // 更改4: d(i,j) = d(j,i)
-            euclidean_distance[i * n + j] = euclidean_distance[j * n + i] = (i == j) ? 0 : calc_distance(i, j);
-
+        for (int j = 0; j < n; j++) {
+            if (i == j) {
+                euclidean_distance[i * n + j] = 0;
+            } else {
+                euclidean_distance[i * n + j] = calc_distance(i, j);
+            }
         }
         // printf("calcEuclideanDistanceAndStoreInArray: %d\n", i);
     }
 }
+static long long int run_times = 0;
+// static INLINE double calcOneChebyshevDistance(int dot_id1, int dot_id2,
+//                                               int tid) {
+//     double max = 0;
+//     int d1 = tid * m * n;
+//     for (int i = 0; i < m; i++) {
+//         int d_1 = d1 + i * n + dot_id1;
+//         int d_2 = d1 + i * n + dot_id2;
+//         double diff = fabs(cache_eu_dist[d_1] - cache_eu_dist[d_2]);
+//         // double diff = 0;
+//         if (diff > max) {
+//             max = diff;
+//         }
+//     }
+//     return max;
+// }
 
-static long long int run_times = 0; // 运行时间
-
-// 计算一对顶点之间的切比雪夫距离，在tid层
-static INLINE double calcOneChebyshevDistance(int dot_id1, int dot_id2, int tid) {
+static INLINE double calcOneChebyshevDistance(int dot_id1, int dot_id2,
+                                              int tid) {
     double max = 0;
-    int d1 = tid * m * n;
+    int __num1 = dot_id1, __num2 = dot_id2;
     for (int i = 0; i < m; i++) {
-        int d_1 = d1 + i * n + dot_id1;
-        int d_2 = d1 + i * n + dot_id2;
-        double diff = fabs(cache_eu_dist[d_1] - cache_eu_dist[d_2]);
-        max = (diff > max) ? diff : max;
+        int base = n * i;
+        __num1 += base;
+        __num2 += base;
+        double diff =
+            fabs(cache_eu_dist[tid][__num1] - cache_eu_dist[tid][__num2]);
+        // double diff = 0;
+        if (diff > max) {
+            max = diff;
+        }
+        __num1 = dot_id1;
+        __num2 = dot_id2;
     }
     return max;
 }
 
-// 计算组合C(n,m)的数量
-static int __c_n_m = 0; 
+static int __c_n_m = 0;
 static int INLINE c_n_m(int n, int m) {
     // C(n, m) = n! / (m! * (n - m)!)
     if (__c_n_m == 0) {
-        
-        /* int result = 1;
+        int result = 1;
         for (int i = 1; i <= m; i++) {
             result = result * (n - i + 1) / i;
         }
-        __c_n_m = result; 
-        return result;*/
-
-        // *更改2: 计算组合数算法更改
-        int res = 1;
-        // Since C(n, k) = C(n, n-k)
-        if (m > n - m)
-            m = n - m;
-        // Calculate value of
-        // [n * (n-1) *---* (n-k+1)] / [k * (k-1) *----* 1]
-        for (int i = 0; i < m; ++i) {
-            res *= (n - i);
-            res /= (i + 1);
-        }
-        __c_n_m = res;
-        return res;
+        __c_n_m = result;
+        return result;
     }
     return __c_n_m;
 }
 
-
-// 计算所有可能的组合情况，并存储在object数组中。
 static void INLINE calc_all_combinations_and_store_in_object() {
     // printf("calc_all_combinations_and_store_in_object\n");
     int *combi_ = (int *)malloc(sizeof(int) * m);
@@ -221,7 +212,6 @@ static void INLINE calc_all_combinations_and_store_in_object() {
         combi_[i] = i;
     }
     int count_ = 0;
-    // 更改7:把while循环改为for循环？
     while (combi_[m - 1] < n) {
         for (int __i = 0; __i < m; __i++) {
             object[count_].values[__i] = combi_[__i];
@@ -238,16 +228,19 @@ static void INLINE calc_all_combinations_and_store_in_object() {
     }
 }
 
-// 比较两个组合的目标函数值
 int compare_2_combinations(const void *a, const void *b) {
     combination *c1 = (combination *)a;
     combination *c2 = (combination *)b;
     // compare double type, but return int type
-    return (c1->cost > c2->cost) ? 1 : ((c1->cost < c2->cost) ? -1 : 0);
-    
+    if (c1->cost > c2->cost) {
+        return 1;
+    } else if (c1->cost < c2->cost) {
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
-// 根据目标函数值对object数组中的组合对应的函数值进行排序
 static void INLINE sort_object_array_by_cost(int DEBUG) {
     // This function is really quick. when n = 500 and m = 2,
     // it only takes 18 ms to sort 124750 combinations in object array.
@@ -342,7 +335,6 @@ int main(int argc, char *argv[]) {
         struct timeval start, end;
 
         // M : number of combinations to store
-        // M：需要存储的组合的数量
         const int M = 1000;
         FILE *file = fopen(filename, "r");
         if (file == NULL) {
@@ -352,16 +344,19 @@ int main(int argc, char *argv[]) {
         fscanf(file, "%d", &dim);
         fscanf(file, "%d", &n);
         fscanf(file, "%d", &nums_p);
-        m = nums_p; // 支撑点的数量
-        // printf("dim = %d, point number = %d, pivot numver = %d, thread number = %d, using file %s\n", dim, n,
-        // *更改拼写错误
-        printf("dim = %d, point number = %d, pivot number = %d, thread number = %d, using file %s\n", dim, n,
-               nums_p, thread_count, filename);
+        m = nums_p;
+        printf(
+            "dim = %d, point number = %d, pivot numver = %d, thread number = "
+            "%d, using file %s\n",
+            dim, n, nums_p, thread_count, filename);
 
         // allocate memory for points
-        // 为顶点分配内存
         points = (double *)malloc(sizeof(double) * n * dim);
-        cache_eu_dist = (double *)malloc(sizeof(double) * thread_count * m * n);
+        // cache_eu_dist is double**
+        cache_eu_dist = (double **)malloc(sizeof(double *) * thread_count);
+        for (int i = 0; i < thread_count; i++) {
+            cache_eu_dist[i] = (double *)malloc(sizeof(double) * m * n);
+        }
         // read points
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < dim; j++) {
@@ -370,76 +365,64 @@ int main(int argc, char *argv[]) {
         }
         printf("points read finished.\n");
         fclose(file);
-
-        // 开始计时
         gettimeofday(&start, NULL);
-        // n*n的矩阵存储两点之间的欧几里得距离
         euclidean_distance = (double *)malloc(sizeof(double) * n * n);
-        // 类型为combination的数组object
         object = (combination *)malloc(sizeof(combination) * c_n_m(n, m));
-        // *更改，可以加 #pragma omp parallel for ?
-        // #pragma omp parallel for (变慢了)
         for (int i = 0; i < c_n_m(n, m); i++) {
             object[i].values = (int *)malloc(sizeof(int) * m);
             object[i].cost = 0;
         }
-        // calculate the Euclidean distance between every two points, in the original coordinate.
-        // 在原始坐标系中计算两点的欧几里得距离
+        // calculate the Euclidean distance between every two points, in the
+        // original coordinate.
         calcEuclideanDistanceAndStoreInArray();
         printf("Euclidean distance calculated.\n");
-        // 计算所有可能的组合，未计算cost
         calc_all_combinations_and_store_in_object();
         printf("all combinations calculated.\n");
 
         // *********************************************************
-        // 组合数C(n,m)
         int len = c_n_m(n, m);
-        // set omp thread number
-        // Q: 怎么确定的schedule(static,200)？
-        #pragma omp parallel for schedule(static,200) num_threads(thread_count) 
-        // #pragma omp parallel for schedule(guided) num_threads(thread_count)
+// set omp thread number
+#pragma omp parallel for schedule(static, 200) num_threads(thread_count)
         for (int i = 0; i < len; i++) {
             int tid = omp_get_thread_num();
-            int d1 = tid * m * n;
             int *values = object[i].values;
-            // 计算cube中d1层的矩阵
             for (int __m__ = 0; __m__ < m; __m__++) {
-                int d2 = d1 + __m__ * n;
                 int pivot_id = values[__m__];
                 int _d2 = pivot_id * n;
                 for (int __n__ = 0; __n__ < n; __n__++) {
-                    cache_eu_dist[d2 + __n__] = euclidean_distance[_d2 + __n__];
+                    cache_eu_dist[tid][__m__ * n + __n__] =
+                        euclidean_distance[_d2 + __n__];
                 }
             }
-            // 计算每两点之间的切比雪夫距离
             for (int __i__ = 0; __i__ < n; __i__++) {
-                for (int __j__ = __i__ + 1; __j__ < n; __j__++) {
-                    object[i].cost += calcOneChebyshevDistance(__i__, __j__, tid);
+                int bound = __i__ + 1;
+                for (int __j__ = bound; __j__ < n; __j__++) {
+                    object[i].cost +=
+                        calcOneChebyshevDistance(__i__, __j__, tid);
                 }
             }
         }
-        
 
         // sort the object array by cost
-        // 根据cost排序
-        sort_object_array_by_cost(0);   // 1: show debug message, 0: not
+        sort_object_array_by_cost(0);  // 1: show debug message, 0: not
 
-        // 结束计时
+        // end timer
         gettimeofday(&end, NULL);
-        // 1s = 1000ms, 1ms = 1000us
         printf("time cost: %ld ms \n",
                (end.tv_sec - start.tv_sec) * 1000 +
                    (end.tv_usec - start.tv_usec) / 1000);
         // sniff_object_array();  // result seems to be correct :-)
         dmp_object_array_to_file();
-
-        // 释放空间
         free(points);
         free(euclidean_distance);
         for (int i = 0; i < c_n_m(n, m); i++) {
             free(object[i].values);
         }
         free(object);
+        
+        for (int i = 0; i < thread_count; i++) {
+            free(cache_eu_dist[i]);
+        }
         free(cache_eu_dist);
     } else {
         struct timeval start, end;

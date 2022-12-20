@@ -1,5 +1,5 @@
 pivot:
-	gcc-12 -Wall -Ofast -march=native -fopenmp -ffast-math ./pivot.c -o pivot
+	gcc -Wall -Ofast -fopenmp -ffast-math ./pivot.c -o pivot
 
 clean:
 	rm -f pivot

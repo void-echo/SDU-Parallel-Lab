@@ -8,7 +8,7 @@ make
 # `small` for small test, `big` for big test
 declare isSmallTestOrBigTest="small"
 # declare isSmallTestOrBigTest="big"
-declare exe_name="out"
+declare exe_name="pivot"
 
 if [ "$isSmallTestOrBigTest" = "small" ]; then
     declare -a thread_nums=("1" "2" "4" "8" "12" "16")
